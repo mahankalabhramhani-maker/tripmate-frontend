@@ -3,7 +3,85 @@
  * Full-stack Client communicating with Spring Boot REST Backend
  */
 
-const API_BASE_URL = 'http://localhost:8081/api';
+function resolveApiBaseUrl() {
+    const custom = localStorage.getItem('tm_api_base_url');
+    if (custom && custom.trim()) {
+        return custom.trim().replace(/\/+$/, '');
+    }
+    if (window.TRIPMATE_API_BASE_URL) {
+        return window.TRIPMATE_API_BASE_URL.replace(/\/+$/, '');
+    }
+    const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname) || window.location.protocol === 'file:';
+    if (isLocal) {
+        return 'http://localhost:8081/api';
+    }
+    // In production on Vercel or cloud host, default to /api or saved URL
+    return '/api';
+}
+
+let API_BASE_URL = resolveApiBaseUrl();
+
+const FALLBACK_DESTINATIONS = [
+    {
+        id: 1,
+        name: "Goa",
+        country: "India",
+        description: "Famous for its sun-kissed golden beaches, Portuguese colonial architecture, vibrant shacks, and seafood.",
+        averageBudget: 18000.0,
+        imageUrl: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+        id: 2,
+        name: "Hyderabad",
+        country: "India",
+        description: "City of Pearls, famous for Charminar, Golconda Fort, and authentic Hyderabadi Dum Biryani.",
+        averageBudget: 12000.0,
+        imageUrl: "https://images.unsplash.com/photo-1605335198889-4d8964344557?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+        id: 3,
+        name: "Jaipur",
+        country: "India",
+        description: "The Pink City showcasing majestic palaces, Amer Fort, vibrant bazaars, and rich Rajput heritage.",
+        averageBudget: 15000.0,
+        imageUrl: "https://images.unsplash.com/photo-1477587458883-47145ed94245?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+        id: 4,
+        name: "Manali",
+        country: "India",
+        description: "Snow-capped Himalayan resort town in Himachal Pradesh ideal for adventure, trekking, and skiing.",
+        averageBudget: 22000.0,
+        imageUrl: "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+        id: 5,
+        name: "Kashmir",
+        country: "India",
+        description: "Paradise on Earth with serene Dal Lake shikara rides, Gulmarg gondolas, and breathtaking snow peaks.",
+        averageBudget: 28000.0,
+        imageUrl: "https://images.unsplash.com/photo-1595815771614-ade9d652a65d?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+        id: 6,
+        name: "Mumbai",
+        country: "India",
+        description: "The City of Dreams with Gateway of India, Marine Drive Queen's Necklace, and Bollywood charm.",
+        averageBudget: 20000.0,
+        imageUrl: "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?auto=format&fit=crop&w=1200&q=80"
+    }
+];
+
+const FALLBACK_PLACES = [
+    { id: 1, name: "Baga Beach", description: "Lively beach renowned for water sports, beach shacks, and vibrant nightlife.", category: "Beach", location: "North Goa", estimatedCost: 500.0, destination: { id: 1, name: "Goa" }, imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" },
+    { id: 2, name: "Calangute Beach", description: "The Queen of Beaches with bustling flea markets and water parasailing.", category: "Beach", location: "North Goa", estimatedCost: 400.0, destination: { id: 1, name: "Goa" }, imageUrl: "https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=800&q=80" },
+    { id: 3, name: "Fort Aguada", description: "17th-century Portuguese fortress overlooking the Arabian Sea with a historic lighthouse.", category: "Historical", location: "Candolim, Goa", estimatedCost: 100.0, destination: { id: 1, name: "Goa" }, imageUrl: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80" },
+    { id: 4, name: "Charminar", description: "Historic 16th-century landmark mosque with four grand arches and bustling Laad Bazaar.", category: "Historical", location: "Old City, Hyderabad", estimatedCost: 50.0, destination: { id: 2, name: "Hyderabad" }, imageUrl: "https://images.unsplash.com/photo-1605335198889-4d8964344557?auto=format&fit=crop&w=800&q=80" },
+    { id: 5, name: "Golconda Fort", description: "Medieval diamond capital citadel featuring phenomenal acoustic engineering and sound-light shows.", category: "Historical", location: "Ibrahim Bagh, Hyderabad", estimatedCost: 100.0, destination: { id: 2, name: "Hyderabad" }, imageUrl: "https://images.unsplash.com/photo-1627894483216-2138af692e32?auto=format&fit=crop&w=800&q=80" },
+    { id: 6, name: "Amer Fort", description: "Stunning hilltop fortress with artistic Hindu elements, Maota Lake views, and Sheesh Mahal mirror palace.", category: "Historical", location: "Amer, Jaipur", estimatedCost: 200.0, destination: { id: 3, name: "Jaipur" }, imageUrl: "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80" },
+    { id: 7, name: "Hawa Mahal", description: "Palace of Winds built with pink and red sandstone with 953 intricately carved jharokhas.", category: "Historical", location: "Badi Choupad, Jaipur", estimatedCost: 100.0, destination: { id: 3, name: "Jaipur" }, imageUrl: "https://images.unsplash.com/photo-1609137144822-2639fb2b23a7?auto=format&fit=crop&w=800&q=80" },
+    { id: 8, name: "Solang Valley", description: "Adventure hub for paragliding, zorbing, ATV quad biking, and winter snow skiing.", category: "Adventure", location: "Solang, Manali", estimatedCost: 1200.0, destination: { id: 4, name: "Manali" }, imageUrl: "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=800&q=80" }
+];
 
 class TripMateApp {
     constructor() {
@@ -250,7 +328,12 @@ class TripMateApp {
             this.renderHomeDestinations(this.destinations.slice(0, 3));
             this.populateDestinationDropdowns();
         } catch (err) {
-            console.error(err);
+            console.warn('Backend not reached, using preview destinations:', err);
+            this.destinations = FALLBACK_DESTINATIONS;
+            this.renderDestinations(this.destinations);
+            this.renderHomeDestinations(this.destinations.slice(0, 3));
+            this.populateDestinationDropdowns();
+            this.notifyBackendOffline();
         }
     }
 
@@ -406,7 +489,9 @@ class TripMateApp {
             this.places = await res.json();
             this.renderPlaces(this.places);
         } catch (err) {
-            console.error(err);
+            console.warn('Backend not reached, using preview places:', err);
+            this.places = FALLBACK_PLACES;
+            this.renderPlaces(this.places);
         }
     }
 
@@ -1349,6 +1434,70 @@ class TripMateApp {
             toast.style.transform = 'translateX(50px)';
             setTimeout(() => toast.remove(), 300);
         }, 4000);
+    }
+
+    /* ================= SERVER & API CONFIGURATION ================= */
+    notifyBackendOffline() {
+        if (this._notifiedOffline) return;
+        this._notifiedOffline = true;
+        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname) || window.location.protocol === 'file:';
+        if (!isLocal) {
+            this.showToast('Note: Live backend not detected. Displaying preview data. Click "API Server" to connect a live endpoint.', 'info');
+        }
+    }
+
+    openServerModal() {
+        const modal = document.getElementById('server-modal');
+        const input = document.getElementById('server-url-input');
+        if (input) input.value = API_BASE_URL;
+        if (modal) modal.classList.add('show');
+    }
+
+    closeServerModal() {
+        const modal = document.getElementById('server-modal');
+        if (modal) modal.classList.remove('show');
+    }
+
+    async handleSaveServerUrl(event) {
+        event.preventDefault();
+        const input = document.getElementById('server-url-input');
+        const val = input ? input.value.trim().replace(/\/+$/, '') : '';
+        if (val) {
+            localStorage.setItem('tm_api_base_url', val);
+            API_BASE_URL = val;
+            this.showToast(`API endpoint updated to: ${val}`, 'success');
+            this.closeServerModal();
+            await this.loadDestinations();
+            await this.loadPlaces();
+            if (this.isAuthenticated()) this.loadUserTrips();
+        }
+    }
+
+    async testServerConnection() {
+        const input = document.getElementById('server-url-input');
+        const testRes = document.getElementById('server-test-result');
+        const url = (input ? input.value.trim() : API_BASE_URL).replace(/\/+$/, '');
+        if (testRes) testRes.innerHTML = '<span style="color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Testing connection...</span>';
+        try {
+            const res = await fetch(`${url}/destinations`, { method: 'GET' });
+            if (res.ok) {
+                if (testRes) testRes.innerHTML = '<span style="color: #10b981;"><i class="fa-solid fa-circle-check"></i> Connected successfully! Spring Boot responded.</span>';
+            } else {
+                if (testRes) testRes.innerHTML = `<span style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Server returned HTTP ${res.status}.</span>`;
+            }
+        } catch (e) {
+            if (testRes) testRes.innerHTML = `<span style="color: #ef4444;"><i class="fa-solid fa-circle-xmark"></i> Connection failed: ${e.message}. Ensure backend is running with CORS enabled.</span>`;
+        }
+    }
+
+    resetServerUrl() {
+        localStorage.removeItem('tm_api_base_url');
+        API_BASE_URL = resolveApiBaseUrl();
+        const input = document.getElementById('server-url-input');
+        if (input) input.value = API_BASE_URL;
+        const testRes = document.getElementById('server-test-result');
+        if (testRes) testRes.innerHTML = '<span style="color: var(--text-muted);">Reset to default.</span>';
+        this.showToast('Reset API Base URL to default.', 'info');
     }
 }
 

@@ -1479,7 +1479,10 @@ class TripMateApp {
         const url = (input ? input.value.trim() : API_BASE_URL).replace(/\/+$/, '');
         if (testRes) testRes.innerHTML = '<span style="color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Testing connection...</span>';
         try {
-            const res = await fetch(`${url}/destinations`, { method: 'GET' });
+            let res = await fetch(`${url}/health`, { method: 'GET' });
+            if (!res.ok) {
+                res = await fetch(`${url}/destinations`, { method: 'GET' });
+            }
             if (res.ok) {
                 if (testRes) testRes.innerHTML = '<span style="color: #10b981;"><i class="fa-solid fa-circle-check"></i> Connected successfully! Spring Boot responded.</span>';
             } else {

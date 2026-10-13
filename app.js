@@ -3,20 +3,73 @@
  * Full-stack Client communicating with Spring Boot REST Backend
  */
 
+const DEFAULT_PROD_API_BASE_URL = 'https://tripmate-backend-gl4s.onrender.com/api';
+
+/**
+ * Safely parses HTTP response from the backend.
+ * Inspects response status, Content-Type, and body text before attempting JSON parsing,
+ * ensuring HTML/plain-text responses (e.g. 404, 502, 503) never throw "Unexpected token ... is not valid JSON".
+ */
+async function parseApiResponse(res, defaultErrorMsg = 'Request failed') {
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const isJson = contentType.includes('application/json');
+    let rawText = '';
+
+    try {
+        rawText = await res.text();
+    } catch (e) {
+        rawText = '';
+    }
+
+    let parsedData = null;
+    if (rawText && (isJson || rawText.trim().startsWith('{') || rawText.trim().startsWith('['))) {
+        try {
+            parsedData = JSON.parse(rawText);
+        } catch (e) {
+            parsedData = null;
+        }
+    }
+
+    if (!res.ok) {
+        let errMsg = '';
+        if (parsedData && (parsedData.message || parsedData.error)) {
+            errMsg = parsedData.message || parsedData.error;
+        } else if (res.status === 404) {
+            errMsg = 'Endpoint not found (404). Please ensure the backend is running and the API URL is correct.';
+        } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+            errMsg = `Backend service unavailable (HTTP ${res.status}). The Render backend may be starting up (cold start). Please try again in 30 seconds.`;
+        } else if (rawText && !rawText.trim().startsWith('<') && rawText.trim().length < 200) {
+            errMsg = rawText.trim();
+        } else {
+            errMsg = `${defaultErrorMsg} (HTTP ${res.status})`;
+        }
+        throw new Error(errMsg);
+    }
+
+    return parsedData !== null ? parsedData : rawText;
+}
+
 function resolveApiBaseUrl() {
     const custom = localStorage.getItem('tm_api_base_url');
     if (custom && custom.trim()) {
-        return custom.trim().replace(/\/+$/, '');
-    }
-    if (window.TRIPMATE_API_BASE_URL) {
-        return window.TRIPMATE_API_BASE_URL.replace(/\/+$/, '');
+        const cleaned = custom.trim().replace(/\/+$/, '');
+        // Ignore stale relative '/api' or self-referential vercel URLs from previous sessions
+        if (cleaned !== '/api' && !cleaned.includes('vercel.app') && (cleaned.startsWith('http://') || cleaned.startsWith('https://'))) {
+            return cleaned;
+        }
     }
     const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname) || window.location.protocol === 'file:';
     if (isLocal) {
         return 'http://localhost:8081/api';
     }
-    // In production on Vercel or cloud host, default to /api or saved URL
-    return '/api';
+    if (window.TRIPMATE_API_BASE_URL) {
+        const winUrl = window.TRIPMATE_API_BASE_URL.replace(/\/+$/, '');
+        if (!winUrl.includes('vercel.app')) {
+            return winUrl;
+        }
+    }
+    // In production on Vercel or other cloud hosts, default to the deployed Render backend
+    return DEFAULT_PROD_API_BASE_URL;
 }
 
 let API_BASE_URL = resolveApiBaseUrl();
@@ -194,18 +247,25 @@ class TripMateApp {
         event.preventDefault();
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value;
+        const submitBtn = event.target ? event.target.querySelector('button[type="submit"]') : null;
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
 
         try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in...';
+            }
+
             const res = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify({ email, password })
             });
 
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.message || 'Login failed');
-            }
+            const data = await parseApiResponse(res, 'Login failed');
 
             this.token = data.token;
             this.currentUser = { id: data.id, name: data.name, email: data.email };
@@ -219,6 +279,11 @@ class TripMateApp {
             this.showSection('dashboard');
         } catch (err) {
             this.showToast(err.message, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
         }
     }
 
@@ -227,18 +292,25 @@ class TripMateApp {
         const name = document.getElementById('register-name').value.trim();
         const email = document.getElementById('register-email').value.trim();
         const password = document.getElementById('register-password').value;
+        const submitBtn = event.target ? event.target.querySelector('button[type="submit"]') : null;
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
 
         try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...';
+            }
+
             const res = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify({ name, email, password })
             });
 
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.message || 'Registration failed');
-            }
+            const data = await parseApiResponse(res, 'Registration failed');
 
             this.token = data.token;
             this.currentUser = { id: data.id, name: data.name, email: data.email };
@@ -252,6 +324,11 @@ class TripMateApp {
             this.showSection('dashboard');
         } catch (err) {
             this.showToast(err.message, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
         }
     }
 
@@ -1486,7 +1563,8 @@ class TripMateApp {
             if (res.ok) {
                 if (testRes) testRes.innerHTML = '<span style="color: #10b981;"><i class="fa-solid fa-circle-check"></i> Connected successfully! Spring Boot responded.</span>';
             } else {
-                if (testRes) testRes.innerHTML = `<span style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Server returned HTTP ${res.status}.</span>`;
+                const hint = (res.status === 502 || res.status === 503) ? ' (Render backend may be spinning up from sleep; retry shortly)' : '';
+                if (testRes) testRes.innerHTML = `<span style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Server returned HTTP ${res.status}${hint}.</span>`;
             }
         } catch (e) {
             if (testRes) testRes.innerHTML = `<span style="color: #ef4444;"><i class="fa-solid fa-circle-xmark"></i> Connection failed: ${e.message}. Ensure backend is running with CORS enabled.</span>`;

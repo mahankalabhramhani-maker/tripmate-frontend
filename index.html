@@ -797,10 +797,10 @@
             <form onsubmit="app.handleSaveServerUrl(event)">
                 <div class="form-group">
                     <label for="server-url-input"><i class="fa-solid fa-link"></i> API Base URL</label>
-                    <input type="text" id="server-url-input" placeholder="http://localhost:8081/api or https://your-backend.onrender.com/api" required>
+                    <input type="text" id="server-url-input" placeholder="https://tripmate-backend-gl4s.onrender.com/api" required>
                     <small style="color: var(--text-muted); display: block; margin-top: 8px; line-height: 1.4;">
-                        • Local default: <code>http://localhost:8081/api</code><br>
-                        • Cloud backend (Render / Railway / ngrok): <code>https://your-domain/api</code>
+                        • Cloud backend (Render): <code>https://tripmate-backend-gl4s.onrender.com/api</code><br>
+                        • Local default: <code>http://localhost:8081/api</code>
                     </small>
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
@@ -813,7 +813,11 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Backend Configuration & Scripts -->
+    <script>
+        // Pre-configure live Render Spring Boot backend
+        window.TRIPMATE_API_BASE_URL = 'https://tripmate-backend-gl4s.onrender.com/api';
+    </script>
     <script src="app.js"></script>
 </body>
 </html>
